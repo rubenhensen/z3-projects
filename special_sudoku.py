@@ -49,9 +49,9 @@ print_matrix(colours)
 # YOUR CODE GOES HERE
 solver = Solver()
 
-S = [[Int("x_%s_%s" % (i, j)) for j in range(9)]  # Sudoku
+S = [[Int("s_%s_%s" % (i, j)) for j in range(9)]  # Sudoku
      for i in range(9)]
-B = [[Bool("x_%s_%s" % (i, j)) for j in range(9)]  # Ships
+B = [[Bool("b_%s_%s" % (i, j)) for j in range(9)]  # Ships
      for i in range(9)]
 
 
@@ -161,13 +161,9 @@ def check_around(x, y):
     
 
 # Lock in clues to z3 sudoku variables
-for (y, c1) in enumerate(clues):
-    for (x, c2) in enumerate(c1):
-        if c2 != 0:
-            # print("(", x, ",", y,")")
-            cs = S[x][y] == c2
-            # print(cs)
-            solver.add(cs)
+lock_in_clues = [ Implies(Not(clues[i][j] == 0), S[j][i] == clues[i][j]) for i in range(9) for j in range(9)]
+print(lock_in_clues)
+solver.add(lock_in_clues)
 
 # Lock in colours to z3 ship variable
 for (y, c1) in enumerate(colours):
@@ -226,7 +222,7 @@ solver.add(consecutive_numbers)
 # Check the number of total ships.
 count_ships = [ship_nr_constraint_gen(ship_length)
                        for ship_length in range(2,10)]
-print(count_ships)
+# print(count_ships)
 solver.add(count_ships)
 
 # No ships of length one.
