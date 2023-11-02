@@ -44,7 +44,8 @@ x = [[[Int("h_%s_p%s_r%s" % (i+1, j+1, k+1)) for i in range(5)]
 
 # A person is in a house (1), or is not is a house (0)
 # Or(h_1_p1_r1, h_2_p1_r1, h_3_p1_r1, h_4_p1_r1, h_5_p1_r1)
-one_or_zero   = [Or(x[round][people][house] == 0, x[round][people][house] == 1)  for house in range(5) 
+one_or_zero   = [Or(x[round][people][house] == 0, x[round][people][house] == 1)  
+                for house in range(5) 
                 for people in range(10) 
                 for round in range(5) ]
 
@@ -56,7 +57,7 @@ only_one_house_at_the_same_time = [Sum([(x[round][people][house]) for house in r
 # There are 5 people at one house, or there are none
 five_in_a_house = [Or(Sum([(x[round][people][house]) for people in range(10) ]) == 5, Sum([(x[round][people][house])  for people in range(10) ]) == 0)
                                         for house in range(5) 
-                                        for round in range(5)]
+                                        for round in range(5)]\
 
 # 2 rounds at every house
 two_rounds_per_house = [Sum([Sum([(x[round][people][house]) for people in range(10) ])

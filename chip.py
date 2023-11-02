@@ -13,9 +13,8 @@ REGULAR_CHIPS = [[4, 5], [4, 6], [5, 20], [6, 9], [6, 10], [6, 11],
 [7, 8], [7, 12], [10, 10], [10, 20]]
 
 # DISTANCE = 16
-# DISTANCE = 17
-DISTANCE = 18
-# DISTANCE = 19 # this breaks
+DISTANCE = 17
+# DISTANCE = 18 # this breaks
 
 
 
@@ -145,19 +144,26 @@ class SMT:
         pcR = self._comp_variables[pc1][4]
         pcU = self._comp_variables[pc1][5]
         pcD = self._comp_variables[pc1][1]
+        pcH = self._comp_variables[pc1][2]
+        pcW = self._comp_variables[pc1][3]
 
         _pcL = self._comp_variables[pc2][0]
         _pcR = self._comp_variables[pc2][4]
         _pcU = self._comp_variables[pc2][5]
         _pcD = self._comp_variables[pc2][1]
+        _pcH = self._comp_variables[pc2][2]
+        _pcW = self._comp_variables[pc2][3]
         self._smt_solver.add(
             Or(
-                pcL - _pcL >= dist,
-                pcD - _pcD >= dist,
-                _pcL - pcL >= dist,
-                _pcD - pcD >= dist,
+                Abs((pcL+0.5*pcW) - (_pcL+0.5*_pcW)) >= dist,
+                Abs((pcD+0.5*pcH) - (_pcD+0.5*_pcH)) >= dist
             )
         )
+
+        # print(Or(
+        #     Abs((pcL+0.5*pcW) - (_pcL+0.5*_pcW)) >= dist,
+        #     Abs((pcD+0.5*pcH) - (_pcD+0.5*_pcH)) >= dist
+        # ))
         return
 
     
@@ -290,6 +296,7 @@ class SMT:
                 # print("(x:", x, " ,y:", y, ") - r:", r, " u:", u, " h:", h, " w:", w)
                 ax.add_patch(Rectangle((x, y), w, h, facecolor=numpy.array([1,0,0]), edgecolor=numpy.array([0,0,0]), linewidth=1, alpha=1))
 
+            print(model)
             plt.show()
             return True, result
         return False, None

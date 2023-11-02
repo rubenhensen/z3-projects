@@ -1,4 +1,5 @@
 from z3 import *
+from tabulate import tabulate
 
 # 8 trucks - max 8000kg - 8 pallets - 3 cooled
 
@@ -20,10 +21,9 @@ from z3 import *
 # 8x5 matrix of int variables
 distribution = [[Int("T%s_%s" % (t+1, i+1)) for i in range(5)]
     for t in range(8)]
-
+trucks = [Int("Truck_%s" % (i+1)) for i in range(8)]
 def create_solver(e):
     s = Solver()
-    trucks = [Int("Truck_%s" % (i+1)) for i in range(8)]
 
     truck_weight_limit_min = [trucks[i] >= 0 for i in range(8)] # truck min capacity of 0 kg
     truck_weight_limit_max = [trucks[i] <= 8000 for i in range(8)] # truck max capacity of 8000 kg
@@ -45,6 +45,7 @@ def create_solver(e):
     sum_dupples = [Sum([distribution[i][4] for i in range(8)]) == 20]
     sum_skipples_cooled = [Sum([distribution[i][2] for i in range(5)]) == 0]
     sum_nuzzles_max_one = [distribution[i][0] <= 1 for i in range(8)]
+    at_most_eight_pallets = [Sum([distribution[t][p] for p in range(5)]) <= 8 for t in range(8)]
 
     s.add(distribution_min) 
     s.add(truck_weight_limit_min) 
@@ -56,6 +57,7 @@ def create_solver(e):
     s.add(sum_dupples) 
     s.add(sum_skipples_cooled) 
     s.add(sum_nuzzles_max_one)
+    s.add(at_most_eight_pallets)
 
     if e == True:
         explosive = [Or(distribution[i][1] == distribution[i][1] + distribution[i][3], distribution[i][3] == distribution[i][1] + distribution[i][3])   for i in range(8)]
@@ -74,7 +76,22 @@ def check_nr_of_prittles(nr_prittles, m):
     else:
         s.pop()
         print("Succeeded with ", nr_prittles-1 ," prittles")
-        print(m)
+        # print(m)
+    
+        R = [[0 for t in range(8)] for p in range(6) ]
+
+        for product in range(5):
+            for truck in range(8):
+                R[product][truck] = m.evaluate(distribution[truck][product]).as_long()
+        for weight in range(8):
+            R[5][weight] = m.evaluate(trucks[weight]).as_long()
+
+        #define header names
+        col_names = ["t1", "t2", "t3", "t4", "t5", "t6 (c)", "t7 (c)", "t8 (c)"]
+
+        #display table
+        print(tabulate(R, headers=col_names, showindex="always"))
+        print()
 
 s = create_solver(False)
 check_nr_of_prittles(0, None)
