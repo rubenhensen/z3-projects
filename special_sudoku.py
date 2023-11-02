@@ -161,22 +161,16 @@ def check_around(x, y):
     
 
 # Lock in clues to z3 sudoku variables
-lock_in_clues = [ Implies(Not(clues[i][j] == 0), S[j][i] == clues[i][j]) for i in range(9) for j in range(9)]
-print(lock_in_clues)
+# lock_in_clues = [ Implies(Not(clues[i][j] == 0), S[j][i] == clues[i][j]) for i in range(9) for j in range(9)]
+lock_in_clues = [ S[j][i] == clues[i][j] for i in range(9) for j in range(9) if clues[i][j] != 0]
+# print(lock_in_clues)
 solver.add(lock_in_clues)
 
 # Lock in colours to z3 ship variable
-for (y, c1) in enumerate(colours):
-    for (x, c2) in enumerate(c1):
-        # print(c2)
-        if c2 == 'b':
-            cs = B[x][y] == False
-            # print(cs)
-            solver.add(cs)
-        if c2 == 'y':
-            cs = B[x][y] == True
-            # print(cs)
-            solver.add(cs)
+lock_in_clues = [ And(Implies(colours[i][j] == 'b', B[j][i] == False), Implies(colours[i][j] == 'y', B[j][i] == True))  for i in range(9) for j in range(9)]
+print(lock_in_clues)
+solver.add(lock_in_clues)
+
 
 # Every cell, only numbers 1 through 9
 one_through_nine = [And(S[i][j] >= 1, S[i][j] <= 9)
