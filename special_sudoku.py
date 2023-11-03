@@ -35,16 +35,16 @@ colours = [[lines[i+1][j][0] for j in range(9)] for i in range(9)]
 ########## determining the correct solution! ##########
 
 # uncomment to see the shape of the ships list
-print("ships:", ships)
-print("ships_dict:",ships_dict)
+# print("ships:", ships)
+# print("ships_dict:",ships_dict)
 
 # uncomment to see the shape of the clues matrix
-print("clues")
-print_matrix(clues)
+# print("clues")
+# print_matrix(clues)
 
 # uncomment to see the shape of the colours matrix
-print("colours")
-print_matrix(colours)
+# print("colours")
+# print_matrix(colours)
 
 # YOUR CODE GOES HERE
 solver = Solver()
@@ -55,68 +55,69 @@ B = [[Bool("b_%s_%s" % (i, j)) for j in range(9)]  # Ships
      for i in range(9)]
 
 
-def ship_cs_gen(x, y):
+def consecutive_number_gen(x, y):
     constraints = []
-    # above
-    # print("x:",x)
-    # print("y:",y)
-    # print(S[x][y])
     if y != 0:
         # If the cel above is consecutive, then it is a boat, and next to the boat cannot be another boat.
         constraints.append(
             (Abs(S[x][y] - S[x][y-1]) == 1) == (And(B[x][y] == True, B[x][y-1] == True))
         )
-        if x != 0:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x][y-1]) == 1, And(B[x-1][y] == False, B[x-1][y-1] == False))
-          )
-        if x != 8:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x][y-1]) == 1, And(B[x+1][y] == False, B[x+1][y-1] == False))
-          )
 
     if y != 8 :
         # If the cel above is consecutive, then it is a boat, and next to the boat cannot be another boat.
         constraints.append(
             (Abs(S[x][y] - S[x][y+1]) == 1) == (And(B[x][y] == True, B[x][y+1] == True))
         )
-        if x != 0:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x][y+1]) == 1, And(B[x-1][y] == False, B[x-1][y+1] == False))
-          )
-        if x != 8:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x][y+1]) == 1, And(B[x+1][y] == False, B[x+1][y+1] == False))
-          )
 
     if x != 0 :
         # If the cel above is consecutive, then it is a boat, and next to the boat cannot be another boat.
         constraints.append(
             (Abs(S[x][y] - S[x-1][y]) == 1) == (And(B[x][y] == True, B[x-1][y] == True))
         )
-        if y != 0:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x-1][y]) == 1, And(B[x][y-1] == False, B[x-1][y-1] == False))
-          )
-        if y != 8:
-          constraints.append(
-              Implies(Abs(S[x][y] - S[x-1][y]) == 1, And(B[x][y+1] == False, B[x-1][y+1] == False))
-          )
 
     if x != 8 :
         # If the cel above is consecutive, then it is a boat, and next to the boat cannot be another boat.
         constraints.append(
             (Abs(S[x][y] - S[x+1][y]) == 1) == (And(B[x][y] == True, B[x+1][y] == True))
         )
-        if y != 0:
+          
+    return (And(constraints))
+
+def no_touching_gen(x, y):
+    constraints = []
+    if y != 0:
+        if x != 0:
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x][y-1]) == 1, And(B[x-1][y] == False, B[x-1][y-1] == False))
+          )
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x-1][y]) == 1, And(B[x][y-1] == False, B[x-1][y-1] == False))
+          )
+        if x != 8:
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x][y-1]) == 1, And(B[x+1][y] == False, B[x+1][y-1] == False))
+          )
           constraints.append(
               Implies(Abs(S[x][y] - S[x+1][y]) == 1, And(B[x][y-1] == False, B[x+1][y-1] == False))
           )
-        if y != 8:
+
+    if y != 8 :
+        if x != 0:
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x][y+1]) == 1, And(B[x-1][y] == False, B[x-1][y+1] == False))
+          )
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x-1][y]) == 1, And(B[x][y+1] == False, B[x-1][y+1] == False))
+          )
+        if x != 8:
+          constraints.append(
+              Implies(Abs(S[x][y] - S[x][y+1]) == 1, And(B[x+1][y] == False, B[x+1][y+1] == False))
+          )
           constraints.append(
               Implies(Abs(S[x][y] - S[x+1][y]) == 1, And(B[x][y+1] == False, B[x+1][y+1] == False))
           )
-          
+
+
     return (And(constraints))
 
 # works for 2-7
@@ -167,9 +168,9 @@ lock_in_clues = [ S[j][i] == clues[i][j] for i in range(9) for j in range(9) if 
 solver.add(lock_in_clues)
 
 # Lock in colours to z3 ship variable
-lock_in_clues = [ And(Implies(colours[i][j] == 'b', B[j][i] == False), Implies(colours[i][j] == 'y', B[j][i] == True))  for i in range(9) for j in range(9)]
-print(lock_in_clues)
-solver.add(lock_in_clues)
+lock_in_colours = [ And(Implies(colours[i][j] == 'b', B[j][i] == False), Implies(colours[i][j] == 'y', B[j][i] == True))  for i in range(9) for j in range(9)]
+# print(lock_in_colours)
+solver.add(lock_in_colours)
 
 
 # Every cell, only numbers 1 through 9
@@ -206,11 +207,18 @@ three_by_three = [Or([S[i1+i2*3][j1+j2*3] == v
 solver.add(three_by_three)
 
 # Numbers are consecutive iff there is a ship
-consecutive_numbers = [ship_cs_gen(i, j)
+consecutive_numbers = [consecutive_number_gen(i, j)
                        for i in range(9)
                        for j in range(9)]
 # print(consecutive_numbers)
 solver.add(consecutive_numbers)
+
+# Numbers are consecutive iff there is a ship
+no_touching = [no_touching_gen(i, j)
+                       for i in range(9)
+                       for j in range(9)]
+# print(no_touching)
+solver.add(no_touching)
 
 
 # Check the number of total ships.
