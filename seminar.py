@@ -82,50 +82,76 @@ s.add(professor_with_own_books)
 # Every professor can supervise at most 2 books (optional)
 professor_max_two_books = [Sum([x[student][prof][book] for student in range(len(students)) for book in range(len(books))])<= 2
                                 for prof in range(len(professors))]
-print(professor_max_two_books)
+# print(professor_max_two_books)
 # s.add(professor_max_two_books)
 
 
-# Maximize solution
-res = s.check()
-while (res == sat):
-  m = s.model()
-  print(m)
-  block = []
-  for var in m:
-      block.append(var() != m[var])
-  s.add(Or(block))
-  res = s.check()
+
+#   # print(m)
 
 
 
-########## print the solution ##########
-if s.check() == sat:
-  print("Found solution")
-  m = s.model()
-  # result_3d = [m.evaluate(x[student][prof][book])
-  #           for prof in range(len(professors))
-  #           for book in range(len(books)) 
-  #           for student in range(len(students))]
+# 19 highest preference
+# Add constraint 0 highest pref
+# filter all rank(name, book)) -> sum is 0 on all profs
+# filter all rank(name, book)) -> sum is 1 on all profs
+# if print( == highest then false ( all profs) -> 
+HIGHEST_PREF = 19
+
+
+def max_of_pref_cs(max, pref):
+  return Sum([If(x[student][prof][book],1,0) for prof in range(len(professors)) for student in range(len(students)) for book in range(len(books)) if (rank(students[student], books[book]) == pref)]) <= max
+                                  
+                                  
+                                  
+
+########## maximize/print the solution ##########
+for pref in range(HIGHEST_PREF, 0, -1):
+  for max_students in range(0, len(students)+1):
+    s.push()
+    s.add(max_of_pref_cs(max_students, pref))
+    # print(max_of_pref_cs(max_students, pref))
+    if s.check() == sat:
+      print("nr of students forced with pref", pref, "equals", max_students)
+      break
+    else:
+      s.pop()
+
+
+print("Found solution")
+m = s.model()
+# result_3d = [m.evaluate(x[student][prof][book])
+#           for prof in range(len(professors))
+#           for book in range(len(books)) 
+#           for student in range(len(students))]
+
+print("student x book")
+result = [[m.evaluate(Sum([x[student][prof][book]  for prof in range(len(professors))]))
+          for book in range(len(books))]
+          for student in range(len(students))]
+result = helper.add_index(result, students, books)
+helper.print_table(result)
+
+print("prof x book")
+result = [[m.evaluate(Sum([x[student][prof][book]  for student in range(len(students))]))
+          for book in range(len(books))]
+          for prof in range(len(professors))
+          ]
+result = helper.add_index(result, professors, books)
+helper.print_table(result)
   
-  print("student x book")
-  result = [[m.evaluate(Sum([x[student][prof][book]  for prof in range(len(professors))]))
-            for book in range(len(books))]
-            for student in range(len(students))]
-  result = helper.add_index(result, students, books)
-  helper.print_table(result)
-
-  print("prof x book")
-  result = [[m.evaluate(Sum([x[student][prof][book]  for student in range(len(students))]))
-            for book in range(len(books))]
-            for prof in range(len(professors))
-            ]
-  result = helper.add_index(result, professors, books)
-  helper.print_table(result)
+result = [students[student] + ": " + books[book] + " (" + str(rank(students[student], books[book])) + ")"
+          for student in range(len(students))
+          for book in range(len(books))
+          for prof in range(len(professors))
+          if m.evaluate(x[student][prof][book]) == True
+          ]
+          
+for r in result:
+  print(r)
   
 
-else:
-  print("No solution found")
+
 
 
 
