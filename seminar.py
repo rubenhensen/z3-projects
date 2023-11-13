@@ -8,6 +8,8 @@ from z3 import *
 
 import sys
 import csv
+import helper
+import numpy as np
 
 ########## read input ##########
 
@@ -50,51 +52,77 @@ print(books_for("C"))
 ########## finding a good assignment ##########
 
 # matrix of boolean variables of books, professors and students
-x = [[[Int("%s_%s_%s" % (student, prof, book)) for book in books]
+x = [[[Bool("%s_%s_%s" % (student, prof, book)) for book in books]
         for prof in professors ]
         for student in students]
 
-every_cell_one_or_zero = [Or(x[student][prof][book] == 0, x[student][prof][book] == 1) 
-                          for book in range(len(books)) 
-                          for prof in range(len(professors))
-                          for student in range(len(students))]
-s.add(every_cell_one_or_zero)
-
-one_book_per_student = [Sum([x[student][prof][book] for book in range(len(books)) for prof in range(len(professors))]) == 1
+# Every student has one book.
+one_book_per_student = [Sum([If(x[student][prof][book], 1, 0) for book in range(len(books)) for prof in range(len(professors))]) == 1
         for student in range(len(students))]
-print(one_book_per_student)
+# print("one_book_per_student\n")
+# print(one_book_per_student[0])
 s.add(one_book_per_student)
 
 # Every book can be used only once.
-every_student_a_different_book = [Sum([x[student][prof][book]  for prof in range(len(professors)) for student in range(len(students))]) <= 1
+every_student_a_different_book = [Sum([If(x[student][prof][book],1,0)  for prof in range(len(professors)) for student in range(len(students))]) <= 1
         for book in range(len(books))]
-print(every_student_a_different_book)
+# print("every_student_a_different_book[0]\n")
+# print(every_student_a_different_book)
 s.add(every_student_a_different_book)
 
-# professor_with_own_books = 
+# Every professor can only be connected to their own books
+professor_with_own_books = [x[student][prof][book] == False
+                                 for prof in range(len(professors)) 
+                                 for student in range(len(students))
+                                 for book in range(len(books)) if books[book] not in books_for(professors[prof])]
+# print("professor_with_own_books")
+# print(professor_with_own_books)
+s.add(professor_with_own_books)
+
+# Every professor can supervise at most 2 books (optional)
+professor_max_two_books = [Sum([x[student][prof][book] for student in range(len(students)) for book in range(len(books))])<= 2
+                                for prof in range(len(professors))]
+print(professor_max_two_books)
+# s.add(professor_max_two_books)
 
 
+# Maximize solution
+res = s.check()
+while (res == sat):
+  m = s.model()
+  print(m)
+  block = []
+  for var in m:
+      block.append(var() != m[var])
+  s.add(Or(block))
+  res = s.check()
 
 
-
-# remove this, since it's just to give an example for the output
-# solution = [ (students[i], books[i], rank_by_id(i, i)) for i in range(len(students)) ]
-# for s in solution:
-#   print(s[0] + " : " + s[1] + " (" + str(s[2]) + ")")
 
 ########## print the solution ##########
 if s.check() == sat:
+  print("Found solution")
   m = s.model()
   # result_3d = [m.evaluate(x[student][prof][book])
   #           for prof in range(len(professors))
   #           for book in range(len(books)) 
   #           for student in range(len(students))]
   
+  print("student x book")
   result = [[m.evaluate(Sum([x[student][prof][book]  for prof in range(len(professors))]))
             for book in range(len(books))]
             for student in range(len(students))]
-  for l in result:
-    print(l)
+  result = helper.add_index(result, students, books)
+  helper.print_table(result)
+
+  print("prof x book")
+  result = [[m.evaluate(Sum([x[student][prof][book]  for student in range(len(students))]))
+            for book in range(len(books))]
+            for prof in range(len(professors))
+            ]
+  result = helper.add_index(result, professors, books)
+  helper.print_table(result)
+  
 
 else:
   print("No solution found")
