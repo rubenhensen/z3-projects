@@ -83,7 +83,7 @@ s.add(professor_with_own_books)
 professor_max_two_books = [Sum([x[student][prof][book] for student in range(len(students)) for book in range(len(books))])<= 2
                                 for prof in range(len(professors))]
 # print(professor_max_two_books)
-# s.add(professor_max_two_books)
+s.add(professor_max_two_books)
 
 
 
@@ -120,36 +120,37 @@ for pref in range(HIGHEST_PREF, 0, -1):
 
 print("Found solution")
 m = s.model()
-# result_3d = [m.evaluate(x[student][prof][book])
-#           for prof in range(len(professors))
-#           for book in range(len(books)) 
+
+# print("student x book")
+# result = [[m.evaluate(Sum([x[student][prof][book]  for prof in range(len(professors))]))
+#           for book in range(len(books))]
 #           for student in range(len(students))]
+# result = helper.add_index(result, students, books)
+# helper.print_table(result)
 
-print("student x book")
-result = [[m.evaluate(Sum([x[student][prof][book]  for prof in range(len(professors))]))
-          for book in range(len(books))]
-          for student in range(len(students))]
-result = helper.add_index(result, students, books)
-helper.print_table(result)
-
-print("prof x book")
-result = [[m.evaluate(Sum([x[student][prof][book]  for student in range(len(students))]))
-          for book in range(len(books))]
-          for prof in range(len(professors))
-          ]
-result = helper.add_index(result, professors, books)
-helper.print_table(result)
+# print("prof x book")
+# result = [[m.evaluate(Sum([x[student][prof][book]  for student in range(len(students))]))
+#           for book in range(len(books))]
+#           for prof in range(len(professors))
+#           ]
+# result = helper.add_index(result, professors, books)
+# helper.print_table(result)
   
-result = [students[student] + ": " + books[book] + " (" + str(rank(students[student], books[book])) + ")"
-          for student in range(len(students))
-          for book in range(len(books))
-          for prof in range(len(professors))
-          if m.evaluate(x[student][prof][book]) == True
-          ]
+# result = [students[student] + ": " + books[book] + " (" + str(rank(students[student], books[book])) + ")"
+#           for student in range(len(students))
+#           for book in range(len(books))
+#           for prof in range(len(professors))
+#           if m.evaluate(x[student][prof][book]) == True
+#           ]
           
-for r in result:
-  print(r)
+# for r in result:
+#   print(r)
   
+for student in range(len(students)):
+  for prof in range(len(professors)):
+    for book in range(len(books)):
+      if m.evaluate(x[student][prof][book]) == True:
+        print(students[student], ":", books[book], "(", rank(students[student], books[book]), ")")
 
 
 
