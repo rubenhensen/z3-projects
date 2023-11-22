@@ -415,6 +415,7 @@ class GridEncoding:
         :return:
         """
         # default constraints
+        print("self._grid._grid[0][5]", self._grid._grid[0][5]) 
         print("Generating constraints...")
 
         # floortypes dirs between >= 0 and <= 4
@@ -485,7 +486,7 @@ class GridEncoding:
         
         self._s.push()
         self._s.add(self._max_step_count == 1)
-        for mx_stp in range(81):
+        for mx_stp in range(self._grid.lower_bound, 81):
             print("trying max step:", mx_stp)
             self._s.pop()
             self._s.push()
