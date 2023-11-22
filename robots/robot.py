@@ -415,6 +415,8 @@ class GridEncoding:
         :return:
         """
         # default constraints
+        print("Generating constraints...")
+
         # floortypes dirs between >= 0 and <= 4
         for coord in self._floor_type_cdir_vars:
             self._s.add(coord >= 0, coord <= 3)
@@ -430,8 +432,9 @@ class GridEncoding:
         # print(max_step_cs)
 
         # All coords should be in a finish cell
-
-
+        finish_coords = [(i % len(self._grid._grid), i // len(self._grid._grid)) for i, cell in enumerate(self._grid) if cell == 1]
+        self._s.add([Or([And(i[-1][0] == x, i[-1][1] == y) for i in self._path_coord_vars]) for (x,y) in finish_coords])
+        # print([Or([And(i[-1][0] == x, i[-1][1] == y) for i in self._path_coord_vars]) for (x,y) in finish_coords])
         # if x = x and y = y then finish == true otherwise false.
         # And (self._path_finish_vars)
 
@@ -441,44 +444,75 @@ class GridEncoding:
         #         self._grid._grid[x][y]
 
         #  Set Start coordinates
-        print("Generating constraints...")
         start_coords = [(i % len(self._grid._grid), i // len(self._grid._grid)) for i, cell in enumerate(self._grid) if cell == 0]
         for i, (x, y) in enumerate(start_coords):
             self._s.add(self._path_coord_vars[i][0][0] == x)
             self._s.add(self._path_coord_vars[i][0][1] == y)
 
         # All cardinal directions for all cells
+        # This nested mess seems problematic...
         for x in range(len(self._grid._grid[0])):
             for y in range(len(self._grid._grid)):
                 for j, all_steps in enumerate(self._path_coord_vars):
                     for i, (px, py) in enumerate(all_steps):
                         if i < self._grid.upper_bound -1:
-                            self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0), And(all_steps[i+1][1] == y+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
-                            self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1), And(all_steps[i+1][0] == x+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
-                            self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2), And(all_steps[i+1][1] == y-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
-                            self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3), And(all_steps[i+1][0] == x-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
+                            # ice
+                            if self._grid._grid[x][y] == 4:
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0), And(all_steps[i+1][1] == y+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1), And(all_steps[i+1][0] == x+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2), And(all_steps[i+1][1] == y-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3), And(all_steps[i+1][0] == x-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)))
+
+                            # lava or finish
+                            elif self._grid._grid[x][y] == 2 or self._grid._grid[x][y] == 1:
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0), And(self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i])))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1), And(self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i])))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2), And(self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i])))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3), And(self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i])))
+                            
+                            # everything else
+                            else:
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0), And(all_steps[i+1][1] == y+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1), And(all_steps[i+1][0] == x+1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2), And(all_steps[i+1][1] == y-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
+                                self._s.add(Implies(And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3), And(all_steps[i+1][0] == x-1, self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)))
         
+        
+
         print("Solving constraints...")
         policy = {}
-        if self._s.check() == sat:
-            print("sat")
-            m = self._s.model()
-            print(m)
-            for x in range(len(self._grid._grid[0])):
-                for y in range(len(self._grid._grid)):
-                    num_cardinal = m.evaluate(self._floor_type_cdir_vars[self._grid._grid[x][y]])
-                    if num_cardinal == 0:
-                        policy[Cell(x,y)] = "N"
-                    if num_cardinal == 1:
-                        policy[Cell(x,y)] = "E"
-                    if num_cardinal == 2:
-                        policy[Cell(x,y)] = "S"
-                    if num_cardinal == 3:
-                        policy[Cell(x,y)] = "W"
-        else:
-            print("unsat")
+        num_steps = 0
+        
+        self._s.push()
+        self._s.add(self._max_step_count == 1)
+        for mx_stp in range(81):
+            print("trying max step:", mx_stp)
+            self._s.pop()
+            self._s.push()
+            self._s.add(self._max_step_count == mx_stp)
+            if self._s.check() == sat:
+                break
+            
+        print("sat")
+        m = self._s.model()
+        num_steps = m.evaluate(self._max_step_count)
+        print(m)
+        for x in range(len(self._grid._grid[0])):
+            for y in range(len(self._grid._grid)):
+                num_cardinal = m.evaluate(self._floor_type_cdir_vars[self._grid._grid[x][y]])
+                if num_cardinal == 0:
+                    policy[Cell(x,y)] = "N"
+                if num_cardinal == 1:
+                    policy[Cell(x,y)] = "E"
+                if num_cardinal == 2:
+                    policy[Cell(x,y)] = "S"
+                if num_cardinal == 3:
+                    policy[Cell(x,y)] = "W"
+        return num_steps, policy
 
-        return math.inf, policy
+        # policy constraints
+        # reachable constraints from starting grid of booleans? based on policy
+        # compute arrival time, a grid of integers
 
 def decide(grid, nr_steps = None):
     """
