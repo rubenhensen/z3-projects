@@ -74,6 +74,7 @@ def _gen_z3_ctrs(u: Term, v: Term):
             # Variables are not greater than anything.
             solver.add(z3.Not(z3_gt[(u, v)]))
         case (FnApp((_, args_u)), Var(_)):
+            # Sub rule
             # When u = f(u_1, ..., u_n) and v is a variable,
             # we add the constraint: [u > v] -> ([u_1 >= v] \/ ... \/ [u_n >= v]).
             # Form the disjunctions with the u_i's.
@@ -84,6 +85,7 @@ def _gen_z3_ctrs(u: Term, v: Term):
                 or_exprs
             ))
         case (FnApp((f, args_u)), FnApp((g, args_v))) if f == g and len(args_u) == len(args_v) > 0:
+            # Copy rule
             # Let i be the smallest index 0 <= i < n such that u_i != v_i.
             # We will compute this index below.
             # For this case, the formula we need to add is the following:
@@ -127,6 +129,7 @@ def _gen_z3_ctrs(u: Term, v: Term):
                     )
                 ))
         case (FnApp((f, args_u)), FnApp((g, args_v))) if (not f == g):
+            # Lex rule
             or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u)))
             and_exprs = z3.And((
                     [z3_prec[f] > z3_prec[g]] +
@@ -148,7 +151,9 @@ def _gen_z3_ctrs(u: Term, v: Term):
 def gen_z3_ctrs(s: Term, t: Term):
     # We first collect all subterms u of s and all subterms v of t, and generate
     # variables [u > v]
+    # print("s", s)
     subtm_s = tm.get_subterms(s)
+    # print("subtm_s", subtm_s)
     subtm_t = tm.get_subterms(t)
     for (u, v) in list(itertools.product(subtm_s,subtm_t)):
         gen_z3_gt(u, v)

@@ -29,12 +29,18 @@ def parse_term(desc, variables, sig, pos):
   return ( FnApp((symbol, args)), i + 1 )
 
 def parse(lines):
+    print("lines", lines)
     rules = [ line.split('->') for line in lines ]
+    print("rules", rules)
     rules = [ (r[0].strip(), r[1].strip()) for r in rules if len(r) == 2 ]
+    print("rules", rules)
     variables = set()
     sig = set()
     rules = [ ( parse_term(r[0], variables, sig, 0)[0], parse_term(r[1], variables, sig, 0)[0] ) for r in rules ]
+    print("rules", rules)
     rules = [ Rule(r[0], r[1]) for r in rules ]
+    print("vars", variables)
+    print("sig", sig)
     return Trs( list(variables), list(sig), rules )
 
 def main(inputfile):

@@ -1,0 +1,4 @@
+add(0,y) -> y
+add(s(x),y) -> s(add(x,y))
+mul(0,y) -> 0
+mul(s(x),y) -> add(y, mul(x,y))

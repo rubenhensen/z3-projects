@@ -11,10 +11,19 @@ import math
 from datetime import datetime as dt
 import argparse
 
-from z3 import sat, And, Implies, Or, Int, Bool, Solver, If, Sum, print_matrix, Not
+from z3 import sat, And, Implies, Or, Int, Bool, Solver, If
 
 COLOR_NAMES = ['green', 'black', 'crimson', 'white', 'white', 'violet', 'lightskyblue', 'orange', 'blue', 'yellow',  'deepskyblue', 'teal', 'navajowhite', 'darkgoldenrod', 'lightsalmon']
 
+def z3max(var_list):
+    # # print(var_list)
+    tmp = var_list[0]
+    for i, var in enumerate(var_list):
+        if i+1 < len(var_list):
+            tmp = If(tmp > var_list[i+1], var_list[i], var_list[i+1])
+        
+    return tmp
+    
 
 class Cell:
     """
@@ -60,12 +69,26 @@ class Grid:
         for x in range(0, self.xdim):
             for y in range(0, self.ydim):
                 self._cells.append(Cell(x, y))
-    
+        self._index = 0
+
     def __iter__(self):
         for row in self._grid:
             for item in row:
                 yield item
 
+    # def __next__(self):
+
+        # if self._index < len(self._grid)*len(self._grid[0]):
+        #     y = self._index // len(self._grid)
+        #     x = self._index % len(self._grid)
+        #     item = self._grid[y][x]
+        #     self._index += 1
+        #     return item
+        # else:
+        #     raise StopIteration
+       
+                
+            
 
     @classmethod
     def from_csv(cls, path):
@@ -79,9 +102,8 @@ class Grid:
         with open(path) as csvfile:
             tablereader = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in tablereader:
-                grid.append([int(entry) for entry in row])  
-        grid2 = [list(x) for x in zip(*grid)]
-        return cls(grid2)
+                grid.append([int(entry) for entry in row])
+        return cls(grid)
 
     @classmethod
     def random(cls, size_x : int, size_y : int, diff_terrains : int,
@@ -183,6 +205,8 @@ class Grid:
         Computes the longest possible solution length.
         :return:
         """
+        if self.maxx == 1:
+            return 2
         return self.maxx * self.maxy
 
     def is_target(self, cell):
@@ -208,20 +232,20 @@ class Grid:
         return cell.x <= self.maxx and cell.y <= self.maxy
 
     def neighbours(self, cell, dir):
-        assert dir in ["N", "S", "W", "E", 0, 1, 2, 3]
-        if dir == "W" or dir == 3:
+        assert dir in ["N", "S", "W", "E"]
+        if dir == "N":
             result = [Cell(max(cell.x-1, 0), cell.y)]
             if self.is_ice(cell):
                 result += [Cell(max(cell.x-2, 0), cell.y)]
-        elif dir == "E" or dir == 1:
+        elif dir == "S":
             result = [Cell(min(cell.x+1, self.maxx), cell.y)]
             if self.is_ice(cell):
                 result += [Cell(min(cell.x+2, self.maxx), cell.y)]
-        elif dir == "N" or dir == 0:
+        elif dir == "W":
             result = [Cell(cell.x, max(cell.y-1, 0))]
             if self.is_ice(cell):
                 result += [Cell(cell.x, max(cell.y-2, 0))]
-        elif dir == "S" or dir == 2:
+        elif dir == "E":
             result = [Cell(cell.x, min(cell.y+1, self.maxy))]
             if self.is_ice(cell):
                 result += [Cell(cell.x, min(cell.y+2, self.maxy))]
@@ -254,71 +278,6 @@ class Grid:
                 if self.is_ice(cand):
                     result.append(cand)
         return [n for n in result if not self.is_target(n)]
-    
-    def pred_reach(self, cell, dir, reach):
-        assert dir in [0, 1, 2, 3]
-        result = []
-        if dir == 2 and cell.y > 0:
-            result.append(Cell(cell.x, cell.y - 1))
-        if dir == 0 and cell.y < self.maxy:
-            result.append(Cell(cell.x, cell.y + 1))
-        if dir == 1 and cell.x > 0:
-            result.append(Cell(cell.x - 1, cell.y))
-        if dir == 3 and cell.x < self.maxx:
-            result.append(Cell(cell.x + 1, cell.y))
-        if result == []:
-            return []
-        else:
-            return [reach[result[0].x][result[0].y]]
-    
-    def succ_reach(self, cell, dir, reach):
-        assert dir in [0, 1, 2, 3]
-        result = []
-        if dir == 0 and cell.y > 0:
-            result.append(Cell(cell.x, cell.y - 1))
-        if dir == 2 and cell.y < self.maxy:
-            result.append(Cell(cell.x, cell.y + 1))
-        if dir == 3 and cell.x > 0:
-            result.append(Cell(cell.x - 1, cell.y))
-        if dir == 1 and cell.x < self.maxx:
-            result.append(Cell(cell.x + 1, cell.y))
-        if result == []:
-            return False
-        else:
-            return reach[result[0].x][result[0].y]
-        
-    def succ_time(self, cell, dir, time):
-        assert dir in [0, 1, 2, 3]
-        result = []
-        if dir == 0 and cell.y > 0:
-            result.append(Cell(cell.x, cell.y - 1))
-        if dir == 2 and cell.y < self.maxy:
-            result.append(Cell(cell.x, cell.y + 1))
-        if dir == 3 and cell.x > 0:
-            result.append(Cell(cell.x - 1, cell.y))
-        if dir == 1 and cell.x < self.maxx:
-            result.append(Cell(cell.x + 1, cell.y))
-        if result == []:
-            return []
-        else:
-            return [time[result[0].x][result[0].y]]
-        
-    def pred_obs_act(self, cell, dir, obsact):
-        assert dir in [0, 1, 2, 3]
-        result = []
-        if dir == 2 and cell.y > 0:
-            result.append(Cell(cell.x, cell.y - 1))
-        if dir == 0 and cell.y < self.maxy:
-            result.append(Cell(cell.x, cell.y + 1))
-        if dir == 1 and cell.x > 0:
-            result.append(Cell(cell.x - 1, cell.y))
-        if dir == 3 and cell.x < self.maxx:
-            result.append(Cell(cell.x + 1, cell.y))
-        if result == []:
-            return []
-        else:
-            color = self.get_color(result[0])
-            return [obsact[color][dir]]
 
     def plot(self, path, policy = None, count = None):
         """
@@ -384,7 +343,7 @@ class Grid:
         ax.set_aspect(1)
         if count is not None:
             ax.set_title(f"Solution for {count} steps")
-        ax.pcolor([list(x) for x in zip(*self._grid)], cmap=mpl.colors.ListedColormap(COLOR_NAMES),
+        ax.pcolor(self._grid, cmap=mpl.colors.ListedColormap(COLOR_NAMES),
                   edgecolors='k', linestyle='dashed', linewidths=0.2, vmin=0, vmax=len(COLOR_NAMES))
         bid = dict(boxstyle='round', facecolor='white', alpha=0.7)
 
@@ -403,9 +362,9 @@ class Grid:
                 ax.text(c.x + 0.6, c.y + 0.6, surface_to_text(self._grid[c.x][c.y]), fontsize=10,
                     verticalalignment='top', bbox=bid)
             if policy is not None and c in policy and not self.is_target(c) and not self.is_lava(c):
-                ax.scatter(c.x + 0.5 + xdir_offset(policy[c]), c.y + 0.5 + ydir_offset(policy[c]), s=220, marker=dir_to_carret(policy[c]), color="black")
+                ax.scatter(c.x + 0.5 + ydir_offset(policy[c]), c.y + 0.5 + xdir_offset(policy[c]), s=220, marker=dir_to_carret(policy[c]), color="black")
                 if self.is_ice(c):
-                    ax.scatter(c.x + 0.5 + xdir_offset(policy[c])*0.6, c.y + 0.5 + ydir_offset(policy[c])*0.6, s=220,
+                    ax.scatter(c.x + 0.5 + ydir_offset(policy[c])*0.6, c.y + 0.5 + xdir_offset(policy[c])*0.6, s=220,
                                marker=dir_to_carret(policy[c]), color="black")
         fig.savefig(path)
         plt.close(fig)
@@ -415,12 +374,14 @@ class GridEncoding:
     def __init__(self, grid):
         self._grid = grid
         self._s = Solver()
+        self._floor_type_cdir_vars = []
+        self._path_coord_vars = []
+        self._path_finish_vars = []
 
-    def solve(self):
+    def create_encoding(self):
+        # TODO create the encoding
         """
-        A solution is a tuple (nr_steps, policy) where the nr_steps is the number of steps actually necessary,
-        and a policy, which is a dictionary from grid cells to directions. Returning a policy is optional, but helpful for debugging.
-
+        Create an encoding (you can merge this with solve if you prefer that).
         :return:
         """
         # 0 = Start
@@ -436,177 +397,155 @@ class GridEncoding:
         # 1 = East
         # 2 = South
         # 3 = West
+        self._floor_type_cdir_vars = [Int("floor_type_%s_cardinal_dir" % i) for i in range(max(self._grid)+1)]
+        # print("self._floor_type_cdir_vars", self._floor_type_cdir_vars)
 
-        # One boolean (Z3.Bool) for each observation o ∈ O and action a ∈ A - Po,a:
-        self._observation_action = [[Bool(f"P_{o}_{a}") for a in range(4)] for o in range(max(self._grid)+1)]
-        # print("self._observation_action", self._observation_action)
+        # For all Start cells, create a (x,y) coord tracker integer
+        self._path_coord_vars = [[(Int("path_%s_x_%s" % (i % len(self._grid._grid), j)), Int("path_%s_y_%s" % (i // len(self._grid._grid), j))) for j in range(self._grid.upper_bound+100)] for i, cell in enumerate(self._grid) if cell == 0]
+        # print("self._path_coord_vars", self._path_coord_vars)
 
-        # Each observation has 1 action
-        each_observation_one_action_cs = [Sum([If(self._observation_action[o][a], 1, 0) 
-                                               for a in range(4)]) == 1 
-                                               for o in range(max(self._grid)+1) 
-                                               if o != 2]
-        # print("each_observation_one_action_cs", each_observation_one_action_cs)
-        self._s.add(each_observation_one_action_cs)
+        # Create step integer variables
+        self._step_counter_vars = [[Int("step_%s_%s_%s" % ((i % len(self._grid._grid)), (i // len(self._grid._grid)), j)) for j in range(self._grid.upper_bound+100)] for i, cell in enumerate(self._grid) if cell == 0]
+        # print("self._step_counter_vars", self._step_counter_vars)
 
-        # Lava observation has 0 action
-        lava_observation_zero_action_cs = [Not(self._observation_action[2][a])
-                                               for a in range(4)]
-        # print("lava_observation_zero_action_cs", lava_observation_zero_action_cs)
-        self._s.add(lava_observation_zero_action_cs)
+        self._max_step_count = Int("max_step_count")
+        return
 
-        # One boolean for each cell 〈x, y〉: Reachx,y
-        self._reach = [[Bool(f"Reach_{x}_{y}") for y in range(self._grid.xdim)] for x in range(self._grid.ydim)]
-        # print("self._reach", self._reach)
+    def solve(self):
+        """
+        A solution is a tuple (nr_steps, policy) where the nr_steps is the number of steps actually necessary,
+        and a policy, which is a dictionary from grid cells to directions. Returning a policy is optional, but helpful for debugging.
 
-        # Initial states are reachable
-        initial_states_reach_cs = [self._reach[x][y] for x in range(self._grid.xdim) for y in range(self._grid.ydim) if self._grid._grid[x][y] == 0]
-        # print("initial_states_reach_cs", initial_states_reach_cs)
-        self._s.add(initial_states_reach_cs)
+        :return:
+        """
+        # default constraints
+        # print("Generating constraints...")
 
-        # Lava is never reachable
-        lava_not_reach_cs = [Not(self._reach[x][y]) for x in range(self._grid.xdim) for y in range(self._grid.ydim) if self._grid._grid[x][y] == 2]
-        # print("lava_not_reach_cs", lava_not_reach_cs)
-        self._s.add(lava_not_reach_cs)
+        # floortypes dirs between >= 0 and <= 3
+        card_dir_cs = [And(coord >= 0, coord <= 3) for coord in self._floor_type_cdir_vars]
+        # print("card_dir_cs", card_dir_cs)
+        self._s.add(card_dir_cs)
 
-        # If this cell is reachable, then an adjacent cell should be reachable with a action to this cell
-        reachable_cs = [Implies(
-            self._reach[x][y], 
-            Or(
-                [And(self._grid.pred_reach(Cell(x,y), a, self._reach)[0], 
-                     self._grid.pred_obs_act(Cell(x,y), a, self._observation_action)[0]
-                     ) 
-                 for a in range(4) 
-                 if self._grid.pred_reach(Cell(x,y), a, self._reach) != [] 
-                 and self._grid.pred_obs_act(Cell(x,y), a, self._observation_action) != []
-                ]
-            )) 
-            for x in range(self._grid.xdim) 
-            for y in range(self._grid.ydim) 
-            if self._grid.get_color(Cell(x,y)) != 0]
+        # step counter start at 0
+        step_counter_zero_cs = [row[0] == 0 for row in self._step_counter_vars]
+        # print("step_counter_zero_cs", step_counter_zero_cs)
+        self._s.add(step_counter_zero_cs)
 
-        # print("reachable_cs")
-        # for x in reachable_cs:
-        #     print(x)
-        self._s.add(reachable_cs)
+        # self._step_counter_vars
+        # step count is the max of all step counts
+        max_step_cs = self._max_step_count == z3max([j for i in self._step_counter_vars for j in i])
+        self._s.add(max_step_cs)
+        # print("max_step_cs", max_step_cs)
 
-        # If this cell is reachable, and it has a action to an adjacent cell. Then the adjacent cell is reachable.
-        reachable_inv = [Implies(
-            And(self._reach[x][y], self._observation_action[self._grid.get_color(Cell(x,y))][a]), 
-            self._grid.succ_reach(Cell(x,y), a, self._reach)) 
-            for x in range(self._grid.xdim) 
-            for y in range(self._grid.ydim) 
-            for a in range(4) 
-            if self._grid._grid[x][y] != 1 ]
-        # print("reachable_inv")
-        # for x in reachable_inv:
-        #     print(x)
-        self._s.add(reachable_inv)
+        # All coords should be in a finish cell
+        finish_coords = [(i % len(self._grid._grid), i // len(self._grid._grid)) for i, cell in enumerate(self._grid) if cell == 1]
+        finish_cs = [Or([And(i[-1][0] == x, i[-1][1] == y) for (x,y) in finish_coords]) for i in self._path_coord_vars]
+        self._s.add(finish_cs)
+        print("finish_cs", finish_cs)
 
-        # Time variable matrix
-        self._time = [[Int(f"T_{x}_{y}") for y in range(self._grid.xdim)] for x in range(self._grid.ydim)]
-        # print("self._time", self._time)
+        # All coords should be within the grid
+        within_grid_cs = [And(j[0] >= 0, j[0] <= self._grid.maxx, j[1] >= 0, j[1] <= self._grid.maxy) for i in self._path_coord_vars for j in i]
+        self._s.add(within_grid_cs)
+        # print("within_grid_cs", within_grid_cs)
+        # # print([And(j[0] >= 0, j[0] <= self._grid.maxx, j[1] >= 0, j[1] <= self._grid.maxy) for i in self._path_coord_vars for j in i])
 
-        # Initial states have t >= 1
-        initial_states_time_cs = [self._time[x][y] >= 1 
-             for x in range(self._grid.xdim) 
-             for y in range(self._grid.ydim) 
-             if self._grid._grid[x][y] == 0]
-        # print("initial_states_time_cs")
-        # for x in initial_states_time_cs:
-        #     print(x)
-        self._s.add(initial_states_time_cs)
+        #  Set Start coordinates
+        start_coords = [(i % len(self._grid._grid), i // len(self._grid._grid)) for i, cell in enumerate(self._grid) if cell == 0]
+        for i, (x, y) in enumerate(start_coords):
+            x_cs = self._path_coord_vars[i][0][0] == x
+            self._s.add(x_cs)
+            # print("x_cs", x_cs)
+            y_cs = self._path_coord_vars[i][0][1] == y
+            self._s.add(y_cs)
+            # print("y_cs", y_cs)
 
-        # All successive states have a t higher then there predecessor
-        time_cs = [Implies(
-            And(self._reach[x][y], self._observation_action[self._grid.get_color(Cell(x,y))][a]), 
-            self._grid.succ_time(Cell(x,y), a, self._time)[0] > self._time[x][y]
-            ) 
-            for x in range(self._grid.xdim) 
-            for y in range(self._grid.ydim) 
-            for a in range(4) 
-            if self._grid.get_color(Cell(x,y)) != 1 
-            and self._grid.get_color(self._grid.neighbours(Cell(x,y), a)[0]) != 1 
-            and self._grid.succ_time(Cell(x,y), a, self._time) != []]
-        # print("time_cs")
-        # for t in time_cs:
-        #     print(t)
-        self._s.add(time_cs)
+        # All cardinal directions for all cells
+        # This nested mess seems problematic...
+        for x in range(len(self._grid._grid[0])):
+            for y in range(len(self._grid._grid)):
+                # print((x,y))
+                for j, coord_var in enumerate(self._path_coord_vars):
+                    for i, (px, py) in enumerate(coord_var):
+                        if i < self._grid.upper_bound:
+                            # sticky
+                            if self._grid._grid[x][y] == 4:
+                                n = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0) == And(coord_var[i+1][0] == coord_var[i][0]    , coord_var[i+1][1] == coord_var[i][1] - 1  , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)
+                                e = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1) == And(coord_var[i+1][0] == coord_var[i][0] + 1, coord_var[i+1][1] == coord_var[i][1]      , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)
+                                s = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2) == And(coord_var[i+1][0] == coord_var[i][0]    , coord_var[i+1][1] == coord_var[i][1] + 1  , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)
+                                w = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3) == And(coord_var[i+1][0] == coord_var[i][0] - 1, coord_var[i+1][1] == coord_var[i][1]      , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 7)
+                                self._s.add(n)
+                                self._s.add(e)
+                                self._s.add(s)
+                                self._s.add(w)
+                                # print(n)
+                                # print(e)
+                                # print(s)
+                                # print(w)  
 
-        # All sticky successive states have a t + 7 higher then there predecessor
-        time_sticky_cs = [Implies(
-            And(self._reach[x][y], self._observation_action[self._grid.get_color(Cell(x,y))][a]), 
-            self._grid.succ_time(Cell(x,y), a, self._time)[0] > self._time[x][y] + 6
-            ) 
-            for x in range(self._grid.xdim) 
-            for y in range(self._grid.ydim) 
-            for a in range(4) 
-            if self._grid.get_color(Cell(x,y)) != 1 
-            and self._grid.get_color(self._grid.neighbours(Cell(x,y), a)[0]) == 4
-            and self._grid.succ_time(Cell(x,y), a, self._time) != []]
-        # print("time_cs")
-        # for t in time_cs:
-        #     print(t)
-        self._s.add(time_sticky_cs)
-
-        # Max step restriction
-        def max_step(n):
-            return [And(self._time[x][y] >= 0, self._time[x][y] <= n) 
-                    for x in range(self._grid.xdim) 
-                    for y in range(self._grid.ydim) 
-                    if self._grid._grid[x][y] != 1]
-
+                            # lava or finish
+                            elif self._grid._grid[x][y] == 2 or self._grid._grid[x][y] == 1:
+                                # print(Implies(And(px == x, py == y), And(coord_var[i+1][0] == coord_var[i][0], coord_var[i+1][1] == coord_var[i][1], self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i])))
+                                self._s.add(And(px == x, py == y) == And(coord_var[i+1][0] == coord_var[i][0], coord_var[i+1][1] == coord_var[i][1], self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i]))
+                            
+                            # everything else
+                            else:
+                                n = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 0) == And(coord_var[i+1][0] == coord_var[i][0]    , coord_var[i+1][1] == coord_var[i][1] - 1  , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)
+                                e = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 1) == And(coord_var[i+1][0] == coord_var[i][0] + 1, coord_var[i+1][1] == coord_var[i][1]      , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)
+                                s = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 2) == And(coord_var[i+1][0] == coord_var[i][0]    , coord_var[i+1][1] == coord_var[i][1] + 1  , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)
+                                w = And(px == x, py == y, self._floor_type_cdir_vars[self._grid._grid[x][y]] == 3) == And(coord_var[i+1][0] == coord_var[i][0] - 1, coord_var[i+1][1] == coord_var[i][1]      , self._step_counter_vars[j][i+1] == self._step_counter_vars[j][i] + 1)
+                                self._s.add(n)
+                                self._s.add(e)
+                                self._s.add(s)
+                                self._s.add(w)
+                                # print(n)
+                                # print(e)
+                                # print(s)
+                                # print(w)
+        
+    
+        # print("Solving constraints...")
         policy = {}
-        actions = {}
-        for mx_stp in range(self._grid.lower_bound, 100):
+        num_steps = 0
+        
+        for mx_stp in range(self._grid.lower_bound, 81):
             print("trying max step:", mx_stp)
             self._s.push()
-            self._s.add(max_step(mx_stp))
+            self._s.add(self._max_step_count <= mx_stp)
             if self._s.check() == sat:
                 print("sat")
                 m = self._s.model()
-                # Evaluate policy
-                for c, colors in enumerate(self._observation_action):
-                    for a, action in enumerate(colors):
-                        if m.evaluate(action) == True:
-                            cardinal = ""
-                            if a == 0:
-                                cardinal = "N"
-                            if a == 1:
-                                cardinal = "E"
-                            if a == 2:
-                                cardinal = "S"
-                            if a == 3:
-                                cardinal = "W"
-                            actions[c] = cardinal
-
-                # get a list of all initial states
-                # for all init states
-                    # follow with succ function untill final state
-                initial_states = [Cell(x,y) for x in range(self._grid.xdim) for y in range(self._grid.ydim) if self._grid._grid[x][y] == 0]
-                final_states = [Cell(x,y) for x in range(self._grid.xdim) for y in range(self._grid.ydim) if self._grid._grid[x][y] == 1]
-                for init_state in initial_states:
-                    current_state = init_state
-                    while current_state not in final_states:
-                        # print(current_state)
-                        color = self._grid.get_color(current_state)
-                        policy[current_state] = actions[color]
-                        prev_state = current_state
-                        current_state = self._grid.neighbours(current_state, actions[color])[0]
-                        if prev_state == current_state:
-                            print("Error same state!")
-                            break
-                print(actions)
-                # print("Evaluate(self._observation_action)")
-                # print_matrix([[(y,m.evaluate(y))for y in x] for x in self._observation_action])
-                # print("Evaluate(self._reach)")
-                # print_matrix([[(y,m.evaluate(y)) for y in x] for x in self._reach])
-                # print("Evaluate(self._time)")
-                # print_matrix([[(y,m.evaluate(y))for y in x] for x in self._time])
-                return mx_stp, policy
+                num_steps = m.evaluate(self._max_step_count)
+                for i in self._step_counter_vars:
+                    for j in i:
+                        print(j, m[j])
+                for i in self._path_coord_vars:
+                    for (k,l) in i:
+                        print(k, m[k])
+                        print(l, m[l])
+                for i in self._floor_type_cdir_vars:
+                    print(i, m[i])
+                print(m)
+                for x in range(len(self._grid._grid[0])):
+                    for y in range(len(self._grid._grid)):
+                        num_cardinal = m.evaluate(self._floor_type_cdir_vars[self._grid._grid[x][y]])
+                        if num_cardinal == 0:
+                            policy[Cell(x,y)] = "N"
+                        if num_cardinal == 1:
+                            policy[Cell(x,y)] = "E"
+                        if num_cardinal == 2:
+                            policy[Cell(x,y)] = "S"
+                        if num_cardinal == 3:
+                            policy[Cell(x,y)] = "W"
+                return num_steps, policy
             self._s.pop()
         print("unsat")
         return math.inf, []
+            
+
+
+        # policy constraints
+        # reachable constraints from starting grid of booleans? based on policy
+        # compute arrival time, a grid of integers
 
 def decide(grid, nr_steps = None):
     """
@@ -629,7 +568,7 @@ def solve(grid):
     :return: The nr of steps and the policy that induces this solution.
     """
     encoding = GridEncoding(grid)
-    # encoding.create_encoding()
+    encoding.create_encoding()
     result, policy = encoding.solve()
     return result, policy
 
@@ -649,7 +588,7 @@ def main():
     args = parser.parse_args()
 
     def generate_random_grid(random_grid_code_initialized = False):
-        print("Generating a random grid...(NOTICE: Many grids will not allow reaching the finish in any number of steps).")
+        # print("Generating a random grid...(NOTICE: Many grids will not allow reaching the finish in any number of steps).")
         if not random_grid_code_initialized:
             try:
                 import numpy
@@ -683,25 +622,23 @@ def main():
             print(f"*******************************************")
             print(f"**** Found a solution with {nr_steps} steps.")
             print(f"******************************************")
-            dt_string = args.load_grid
-            grid.plot(f"grid_{dt_string}.png")
-            grid.plot(f"grid_{dt_string}_solution.png", policy=policy, count=nr_steps)
+            grid.plot(f"{args.load_grid}_solution.png", policy=policy, count=nr_steps)
     else:
-        print("Enter batch-generation mode...")
+        # print("Enter batch-generation mode...")
         i = 0
         random_grid_code_initialized = False
 
         while i < args.batch_generation_mode:
 
-            print(f"* Batch generation mode, round {i+1} out of {args.batch_generation_mode}")
+            # print(f"* Batch generation mode, round {i+1} out of {args.batch_generation_mode}")
             grid = generate_random_grid(random_grid_code_initialized)
             random_grid_code_initialized = True
             print_grid_info(grid)
             nr_steps, policy = solve(grid)
             if nr_steps < math.inf and nr_steps >= grid.lower_bound + 4 and nr_steps >= 9 and len(policy) >= (grid.ydim * grid.xdim)*0.3:
                 print(f"* Success! Solution requires {nr_steps} and reaches at least {len(policy)}/{grid.ydim * grid.xdim} cells.")
-                #print(grid)
-                #print(result)
+                # print(grid)
+                # print(result)
                 #dt_string = dt.now().strftime("%Y-%m-%d-%H:%M:%S")
                 dt_string = "2023-A-" + str(i)
                 grid.store_as_csv(f"grid_{dt_string}.csv")
