@@ -17,33 +17,6 @@ def gen_gt_name(s: Term, t: Term) -> str:
                         f"while they should be of type <class tm.Term>")
     return "[" + tm.to_string(s) + ">" + tm.to_string(t) + "]"
 
-def gen_sub_name(s: Term, t: Term) -> str:
-    """
-    Given two terms s and t, generates the string [s >sub t].
-    """
-    if not isinstance(s, Term) and isinstance(t, Term):
-        raise TypeError(f"The arguments is of type {type(s)} and {type(t)} "
-                        f"while they should be of type <class tm.Term>")
-    return "[" + tm.to_string(s) + ">sub" + tm.to_string(t) + "]"
-
-def gen_copy_name(s: Term, t: Term) -> str:
-    """
-    Given two terms s and t, generates the string [s >copy t].
-    """
-    if not isinstance(s, Term) and isinstance(t, Term):
-        raise TypeError(f"The arguments is of type {type(s)} and {type(t)} "
-                        f"while they should be of type <class tm.Term>")
-    return "[" + tm.to_string(s) + ">copy" + tm.to_string(t) + "]"
-
-def gen_lex_name(s: Term, t: Term) -> str:
-    """
-    Given two terms s and t, generates the string [s >lex t].
-    """
-    if not isinstance(s, Term) and isinstance(t, Term):
-        raise TypeError(f"The arguments is of type {type(s)} and {type(t)} "
-                        f"while they should be of type <class tm.Term>")
-    return "[" + tm.to_string(s) + ">lex" + tm.to_string(t) + "]"
-
 
 def gen_gte_name(s: Term, t: Term) -> str:
     return "[" + tm.to_string(s) + ">=" + tm.to_string(t) + "]"
@@ -64,12 +37,8 @@ def gen_fn_pred_name(fn: FnSym) -> str:
 
 z3_gt = {}
 z3_gte = {}
-# z3_sub = {}
-# z3_copy = {}
-# z3_lex = {}
 z3_prec = {}
 
-counter = itertools.count(0)
 
 def gen_z3_gt(s: Term, t: Term) -> None:
     z3_gt[(s, t)] = z3.Bool(gen_gt_name(s, t))
@@ -85,28 +54,10 @@ def gen_z3_gte(s: Term, t: Term) -> None:
     else:
         z3_gte[(s, t)] = z3.Bool(gen_gt_name(s, t))
 
-# def gen_z3_sub(s: Term, t: Term) -> None:
-#     z3_sub[(s, t)] = z3.Bool(gen_sub_name(s, t))
-
-# def gen_z3_copy(s: Term, t: Term) -> None:
-#     z3_copy[(s, t)] = z3.Bool(gen_copy_name(s, t))
-
-# def gen_z3_lex(s: Term, t: Term) -> None:
-#     z3_lex[(s, t)] = z3.Bool(gen_lex_name(s, t))
 
 def gen_z3_prec_vars(fs: list[FnSym]) -> None:
     for f in fs:
         z3_prec[f] = z3.Int(gen_fn_pred_name(f))
-    print(fs)
-    a = fs[1]
-    b = fs[5]
-    c = fs[6]
-    d = fs[3]
-    # e = fs[]
-    f = fs[0]
-    g = fs[2]
-    h = fs[4]
-    solver.add(z3.Not(z3_prec[f] == z3_prec[a] == z3_prec[h] == z3_prec[c] > z3_prec[d] == z3_prec[b] > z3_prec[g]))
 
 
 # Adding constraints over those variables -------------------------------------
@@ -134,43 +85,10 @@ def _gen_z3_ctrs(u: Term, v: Term):
                 or_exprs
             ))
         case (FnApp((f, args_u)), FnApp((g, args_v))) if f == g and len(args_u) == len(args_v) > 0:
-            # Sub+multiset rule
-            # print("f", f, "args_u", args_u)
-            # print("g", g, "args_v", args_v)
-            eq_vars = [z3.Bool(f"EQ_{next(counter)}_{n}") for n in range(len(args_u))]
-            # print(eq_vars)
-            phi_vars = [z3.Int(f"phi_{next(counter)}_{m}") for m in range(len(args_v))]
-            # print(phi_vars)
-
-            or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u))) # sub rule
-
-            eq_false_exprs = [z3.Implies(z3.And(phi_vars[m] == n, z3.Not(eq_vars[n])), z3_gt[(args_u[n], args_v[m])]) 
-             for n in range(len(args_u)) 
-             for m in range(len(args_v))]
-            # print("eq_false_exprs")
-            # solver.add(eq_false_exprs)
-            eq_true_exprs = [z3.Implies(z3.And(phi_vars[m] == n, eq_vars[n]), tm.term_eq(args_u[n], args_v[m])) 
-             for n in range(len(args_u)) 
-             for m in range(len(args_v))]
-            # print("eq_true_exprs")
-            # solver.add(eq_true_exprs)
-            eq_at_least_one_false = z3.Sum([z3.If(z3.Not(eq_vars[n]),1,0) for n in range(len(args_u))]) == 1
-            # print("eq_at_least_one_false")
-            # solver.add(eq_at_least_one_false)
-            and_exprs = z3.And(z3.And(eq_false_exprs), z3.And(eq_true_exprs), z3.And(eq_at_least_one_false))
-
-            solver.add(z3.Implies(
-                z3_gt[(u, v)], 
-                z3.Or(
-                    or_exprs,
-                    and_exprs
-                )
-            ))
-
+            # Copy rule
             # Let i be the smallest index 0 <= i < n such that u_i != v_i.
             # We will compute this index below.
             # For this case, the formula we need to add is the following:
-            # This seems like complete malarkey? This constraint is never generated
             # [u > v] -> (
             #              (\/_i [u_i >= v]) \/
             #              ([u_i > v_i] /\
@@ -179,42 +97,42 @@ def _gen_z3_ctrs(u: Term, v: Term):
             # such that u_i in args_u and v_i in args_v are different,
             # we count the indexes such that u_i == v_i is true.
             # Then the next index is the one such that u_i == v_i is false.
-            # min_index = 0
-            # for u_i, v_i in zip(args_u, args_v):
-            #     if tm.term_eq(u_i, v_i):
-            #         min_index += 1
-            #     else:
-            #         break
+            min_index = 0
+            for u_i, v_i in zip(args_u, args_v):
+                if tm.term_eq(u_i, v_i):
+                    min_index += 1
+                else:
+                    break
             # Now, if no such i exists, it means that all arguments are equal,
             # so u and v are equal, so certainly not u > v.
             # Notice that this only happens whenever min_index is exactly
             # equal to the length of the lists.
-            # if min_index == len(args_u):
-            #     solver.add(z3.Not(z3_gt[(u, v)]))
-            # else:
-            #     # In this case, we have to generate the expression:
-            #     # [u > v] -> (
-            #     #               ([u_1 >= v] \/ ... \/ [u_n >= v]) \/
-            #     #               ([u_i > v_i] /\ [u > v_{i + 1}] /\ ... /\ [u > v_n]) )
-            #     u_i = args_u[min_index]
-            #     v_i = args_v[min_index]
-            #     or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u))) # sub rule
-            #     and_exprs = z3.And(( # lex rule
-            #             [z3_gt[(u_i, v_i)]] +
-            #             list(map(lambda x: z3_gt[u, x], args_v[(min_index + 1):]))
-            #     ))
-            #     solver.add(z3.Implies(
-            #         z3_gt[(u, v)], 
-            #         z3.Or(
-            #             or_exprs,
-            #             and_exprs
-            #         )
-            #     ))
+            if min_index == len(args_u):
+                solver.add(z3.Not(z3_gt[(u, v)]))
+            else:
+                # In this case, we have to generate the expression:
+                # [u > v] -> (
+                #               ([u_1 >= v] \/ ... \/ [u_n >= v]) \/
+                #               ([u_i > v_i] /\ [u > v_{i + 1}] /\ ... /\ [u > v_n]) )
+                u_i = args_u[min_index]
+                v_i = args_v[min_index]
+                or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u)))
+                and_exprs = z3.And((
+                        [z3_gt[(u_i, v_i)]] +
+                        list(map(lambda x: z3_gt[u, x], args_v[(min_index + 1):]))
+                ))
+                solver.add(z3.Implies(
+                    z3_gt[(u, v)],
+                    z3.Or(
+                        or_exprs,
+                        and_exprs
+                    )
+                ))
         case (FnApp((f, args_u)), FnApp((g, args_v))) if (not f == g):
-            # Copy rule
-            or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u))) # sub rule
-            and_exprs = z3.And(( # copy rule
-                    [z3_prec[f] >= z3_prec[g]] + # Changing to quasi-ordering by allowing geq
+            # Lex rule
+            or_exprs = z3.Or(list(map(lambda x: z3_gte[(x, v)], args_u)))
+            and_exprs = z3.And((
+                    [z3_prec[f] > z3_prec[g]] +
                     list(map(lambda x: z3_gt[(u, x)], args_v))
             ))
             solver.add(z3.Implies(
@@ -240,9 +158,6 @@ def gen_z3_ctrs(s: Term, t: Term):
     for (u, v) in list(itertools.product(subtm_s,subtm_t)):
         gen_z3_gt(u, v)
         gen_z3_gte(u, v)
-        # gen_z3_sub(u, v)
-        # gen_z3_copy(u, v)
-        # gen_z3_lex(u, v)
     # We require that [s > t] holds:
     solver.add(z3_gt[(s, t)])
     # Finally, we generate constraints over each subterm u of s and v of t,
@@ -271,8 +186,6 @@ def print_inequalities(model, rules):
     pairs = list(set([ pair for sublist in pairsperrule for pair in sublist ]))
     pairs.sort(key=lambda a:(len(str(a[0])), len(str(a[1]))), reverse=True)
     pairs = [ (u,v) for (u,v) in pairs if model.evaluate(z3_gt[(u,v)], model_completion=True) ]
-    # for p in pairs:
-    #     print(p)
     for pairindex in range(len(pairs)):
         (u,v) = pairs[pairindex]
         if (u,v) in rules: print("(RULE) ", end='')
@@ -293,31 +206,31 @@ def print_inequalities(model, rules):
                 rightroot = g
                 rightargs = args_v
         if v in leftargs:
-            print("SUB because " + str(v) + " >= " + str(v) + ".")
+            print("ARG/(sub?) because " + str(v) + " >= " + str(v) + ".")
             continue
         u_i = next((arg for arg in leftargs if (arg,v) in pairs[pairindex+1:]), None)
         if u_i != None:
             j = pairs.index((u_i,v))
-            print("ARG because " + str(j) + ".")
+            print("ARG/(sub?) because " + str(j) + ".")
             continue
         if rightroot == None:
-            print("ERROR rightroot empty")
+            print("ERROR")
             continue
         if leftroot == rightroot and len(leftargs) == len(rightargs) and leftargs != rightargs:
-            print("MUL because \n", end='')
+            print("LEX because ", end='')
             index = next(i for i in range(len(leftargs)) if leftargs[i] != rightargs[i])
-            # needed = [ (leftargs[index], rightargs[index]) ] +\
-            #          [ (u, rightargs[i]) for i in range(index+1, len(rightargs)) ]
-            # reasons = [ str(pairs.index(p)) if p in pairs else "ERROR mul reason " + str(p[0]) + ">" + str(p[1]) for p in needed]
-            # print(", ".join(reasons))
-            continue
-        if rightroot != None and model.evaluate(z3_prec[leftroot]).as_long() >= model.evaluate(z3_prec[rightroot]).as_long():
-            print("COPY because " + str(f) + " >= " + str(g) + " and ", end='')
-            needed =  [ (u, v_i) for v_i in rightargs ]
-            reasons = [ str(pairs.index(p)) if p in pairs else "ERROR copy reason " + str(p[0]) + ">" + str(p[1]) for p in needed]
+            needed = [ (leftargs[index], rightargs[index]) ] +\
+                     [ (u, rightargs[i]) for i in range(index+1, len(rightargs)) ]
+            reasons = [ str(pairs.index(p)) if p in pairs else "ERROR" + str(p[0]) + ">" + str(p[1]) for p in needed]
             print(", ".join(reasons))
             continue
-        print("ERROR catch all")
+        if rightroot != None and model.evaluate(z3_prec[leftroot]).as_long() > model.evaluate(z3_prec[rightroot]).as_long():
+            print("COPY because " + str(f) + " > " + str(g) + " and ", end='')
+            needed =  [ (u, v_i) for v_i in rightargs ]
+            reasons = [ str(pairs.index(p)) if p in pairs else "ERROR" + str(p[0]) + ">" + str(p[1]) for p in needed]
+            print(", ".join(reasons))
+            continue
+        print("ERROR")
 
 
 def print_proof(model, trs : Trs):
@@ -334,13 +247,13 @@ def prove_termination(trs: Trs):
     # See what the SMT solver says!
     match solver.check():
         case z3.sat:
-            print("YES (term Rewriting System is terminating by MPO)")
+            print("YES (term Rewriting System is terminating by LPO)")
             print_proof(solver.model(), trs)
         case z3.unsat:
-            print("MAYBE (no solution possible with MPO)")
+            print("MAYBE (no solution possible with LPO)")
             exit()
         case z3.unknown:
-            print("MAYBE (SAT solver could not determine if an MPO solution exists)")
+            print("MAYBE (SAT solver could not determine if an LPO solution exists)")
             exit()
         case _:
             raise TypeError("Argument is not an instance of <class Solver>.")
